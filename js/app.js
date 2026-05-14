@@ -147,11 +147,22 @@ const dbAPI = {
 
     async registerActivity(userId, type, points, sponsorId = null, metadata = null) {
         if (supabaseClient) {
+            // Para retos (no quiz) verificar si ya existe para evitar duplicados
+            if (type !== 'sponsor_quiz') {
+                const { data: existing } = await supabaseClient
+                    .from('user_activities')
+                    .select('id')
+                    .eq('user_id', userId)
+                    .eq('activity_type', type)
+                    .maybeSingle();
+                if (existing) return; // Ya registrado en DB — no duplicar
+            }
             const record = { user_id: userId, activity_type: type, points, sponsor_id: sponsorId };
             if (metadata) record.metadata = metadata;
-            await supabaseClient.from('user_activities').insert([record]);
+            const { error } = await supabaseClient.from('user_activities').insert([record]);
+            if (error) throw error; // Lanzar para que el caller lo vea en consola
             const { data: user } = await supabaseClient.from('users').select('total_points').eq('id', userId).single();
-            await supabaseClient.from('users').update({ total_points: user.total_points + points }).eq('id', userId);
+            if (user) await supabaseClient.from('users').update({ total_points: user.total_points + points }).eq('id', userId);
             return;
         }
         return new Promise(res => {
@@ -649,9 +660,10 @@ const app = {
         try {
             await dbAPI.registerActivity(this.currentUser.id, type, points, null, metadata);
         } catch(e) {
-            console.error('registerActivity error', e);
+            console.error('registerActivity error:', e);
         }
-        // Marcar como completado en el set local (persiste aunque loadDashboardData sobreescriba activities)
+
+        // Actualizar estado local inmediatamente (respaldo si DB falla)
         this._localCompletions.add(type);
         this.currentUser.total_points += points;
         this.renderChallenges();
@@ -679,6 +691,10 @@ const app = {
             </div>
         `;
         this.showView('view-extra');
+
+        // Refresh desde Supabase en background para que this.activities quede sincronizado
+        // Así si la página recarga, los checks persisten desde la DB
+        this.loadDashboardData().catch(() => {});
     }
 };
 
