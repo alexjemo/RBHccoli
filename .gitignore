@@ -1,0 +1,7 @@
+node_modules/
+package-lock.json
+*.json
+*.md
+*.js.map
+test*.js
+.gemini/
