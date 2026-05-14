@@ -41,6 +41,7 @@ const adminApp = {
         if (tabName === 'events') this.renderEventsTab(content);
         else if (tabName === 'sponsors') this.renderSponsorsTab(content);
         else if (tabName === 'leaderboard') this.renderLeaderboardTab(content);
+        else if (tabName === 'encuestas') this.renderEncuestasTab(content);
     },
 
     // =================== EVENTS ===================
@@ -290,61 +291,108 @@ const adminApp = {
         list.innerHTML = '<p style="text-align:center;color:#666;">Cargando...</p>';
         const users = await dbAPI.getLeaderboard(eventId);
         list.innerHTML = '';
-
         if (!users.length) {
             list.innerHTML = '<p style="text-align:center;color:#666;">No hay usuarios registrados.</p>';
-        } else {
-            users.forEach((u, i) => {
-                const el = document.createElement('div');
-                el.className = 'leaderboard-item';
-                el.innerHTML = `
-                    <div class="lb-rank">#${i+1}</div>
-                    <div class="lb-info"><div class="lb-name">${u.name}</div><div class="lb-company">${u.company||''}</div></div>
-                    <div class="lb-points">${u.total_points} pts</div>
-                `;
-                list.appendChild(el);
-            });
+            return;
+        }
+        users.forEach((u, i) => {
+            const el = document.createElement('div');
+            el.className = 'leaderboard-item';
+            el.innerHTML = `
+                <div class="lb-rank">#${i+1}</div>
+                <div class="lb-info"><div class="lb-name">${u.name}</div><div class="lb-company">${u.company||''}</div></div>
+                <div class="lb-points">${u.total_points} pts</div>
+            `;
+            list.appendChild(el);
+        });
+    },
+
+    // =================== ENCUESTAS ===================
+    async renderEncuestasTab(container) {
+        const events = await dbAPI.getEvents(true);
+        container.innerHTML = `
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;">
+                <div><h3 style="margin:0;">Encuestas</h3><p class="subtitle" style="margin:0;">Resultados por evento</p></div>
+                <button class="btn btn-secondary" style="width:auto;padding:5px 10px;" onclick="adminApp.loadEncuestasForEvent(document.getElementById('enc-event-selector').value)"><i class="ph ph-arrows-clockwise"></i></button>
+            </div>
+            <select id="enc-event-selector" onchange="adminApp.loadEncuestasForEvent(this.value)"
+                style="width:100%;padding:10px;border:1px solid #ccc;border-radius:8px;font-size:13px;margin-bottom:15px;">
+                <option value="">-- Selecciona un evento --</option>
+                ${events.map(ev => `<option value="${ev.id}">${ev.name.replace('Workshop','Encuentros Tecnológicos')}</option>`).join('')}
+            </select>
+            <div id="enc-list"></div>
+        `;
+    },
+
+    async loadEncuestasForEvent(eventId) {
+        if (!eventId) return;
+        const list = document.getElementById('enc-list');
+        list.innerHTML = '<p style="text-align:center;color:#666;">Cargando...</p>';
+
+        const surveys = await dbAPI.getSurveyResults(eventId);
+        list.innerHTML = '';
+
+        if (!surveys.length) {
+            list.innerHTML = '<p style="text-align:center;color:#aaa;padding:30px 0;">No hay encuestas registradas para este evento.</p>';
+            return;
         }
 
-        // Resultados de encuestas
-        const surveys = await dbAPI.getSurveyResults(eventId);
-        if (surveys.length) {
-            const section = document.createElement('div');
-            section.style.cssText = 'margin-top:28px;';
-            section.innerHTML = `<h3 style="margin:0 0 12px;font-size:15px;color:#0b1a30;">Resultados de encuestas</h3>`;
-            const stars = (n) => '★'.repeat(n) + '☆'.repeat(5 - n);
-            surveys.forEach(s => {
-                const m = s.metadata || {};
-                const el = document.createElement('div');
-                el.style.cssText = 'background:#fff;border-radius:12px;padding:14px 16px;margin-bottom:10px;box-shadow:0 2px 8px rgba(0,0,0,0.05);';
-                el.innerHTML = `
-                    <div style="font-weight:700;font-size:13px;color:#0b1a30;margin-bottom:10px;">
-                        ${s.user?.name || 'Usuario'}
-                        <span style="font-weight:400;color:#8fa0ba;font-size:12px;margin-left:6px;">${s.user?.company || ''}</span>
-                    </div>
-                    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;font-size:11px;color:#333;">
-                        <div style="background:#f5f8ff;border-radius:8px;padding:8px;text-align:center;">
-                            <div style="color:#8fa0ba;margin-bottom:2px;">A. Salón</div>
-                            <div style="color:#f5a623;font-size:13px;">${stars(m.a||0)}</div>
-                            <div style="font-weight:700;">${m.a||0}/5</div>
-                        </div>
-                        <div style="background:#f5f8ff;border-radius:8px;padding:8px;text-align:center;">
-                            <div style="color:#8fa0ba;margin-bottom:2px;">B. Charlas</div>
-                            <div style="color:#f5a623;font-size:13px;">${stars(m.b||0)}</div>
-                            <div style="font-weight:700;">${m.b||0}/5</div>
-                        </div>
-                        <div style="background:#f5f8ff;border-radius:8px;padding:8px;text-align:center;">
-                            <div style="color:#8fa0ba;margin-bottom:2px;">C. Evento</div>
-                            <div style="color:#f5a623;font-size:13px;">${stars(m.c||0)}</div>
-                            <div style="font-weight:700;">${m.c||0}/5</div>
-                        </div>
-                    </div>
-                    ${m.d ? `<div style="margin-top:10px;font-size:12px;color:#555;border-top:1px solid #eee;padding-top:8px;"><span style="color:#8fa0ba;">Opinión: </span>${m.d}</div>` : ''}
-                `;
-                section.appendChild(el);
-            });
-            list.after(section);
+        // Promedios generales
+        const withData = surveys.filter(s => s.metadata);
+        if (withData.length) {
+            const avg = (key) => (withData.reduce((sum, s) => sum + (s.metadata[key] || 0), 0) / withData.length).toFixed(1);
+            const stars = (n) => '★'.repeat(Math.round(n)) + '☆'.repeat(5 - Math.round(n));
+            const summary = document.createElement('div');
+            summary.style.cssText = 'background:linear-gradient(135deg,#1a4ef5,#7b2ff7);border-radius:14px;padding:16px;margin-bottom:20px;color:#fff;';
+            summary.innerHTML = `
+                <div style="font-size:12px;opacity:0.75;margin-bottom:10px;text-transform:uppercase;letter-spacing:1px;">Promedio general · ${withData.length} respuesta${withData.length !== 1 ? 's' : ''}</div>
+                <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;text-align:center;">
+                    <div><div style="font-size:10px;opacity:0.75;margin-bottom:3px;">A. Salón</div><div style="font-size:14px;color:#ffd700;">${stars(avg('a'))}</div><div style="font-size:18px;font-weight:900;">${avg('a')}</div></div>
+                    <div><div style="font-size:10px;opacity:0.75;margin-bottom:3px;">B. Charlas</div><div style="font-size:14px;color:#ffd700;">${stars(avg('b'))}</div><div style="font-size:18px;font-weight:900;">${avg('b')}</div></div>
+                    <div><div style="font-size:10px;opacity:0.75;margin-bottom:3px;">C. Evento</div><div style="font-size:14px;color:#ffd700;">${stars(avg('c'))}</div><div style="font-size:18px;font-weight:900;">${avg('c')}</div></div>
+                </div>
+            `;
+            list.appendChild(summary);
         }
+
+        // Respuesta individual por usuario
+        const starsStr = (n) => '★'.repeat(n || 0) + '☆'.repeat(5 - (n || 0));
+        surveys.forEach(s => {
+            const m = s.metadata || {};
+            const date = s.created_at ? new Date(s.created_at).toLocaleDateString('es', { day: '2-digit', month: 'short', year: 'numeric' }) : '';
+            const el = document.createElement('div');
+            el.style.cssText = 'background:#fff;border-radius:12px;padding:16px;margin-bottom:12px;box-shadow:0 2px 8px rgba(0,0,0,0.06);';
+            el.innerHTML = `
+                <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;">
+                    <div>
+                        <div style="font-weight:700;font-size:14px;color:#0b1a30;">${s.user?.name || 'Usuario'}</div>
+                        <div style="font-size:12px;color:#8fa0ba;">${s.user?.company || ''}</div>
+                    </div>
+                    <div style="font-size:11px;color:#c0c8d8;">${date}</div>
+                </div>
+                ${s.metadata ? `
+                <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:${m.d ? '10px' : '0'};">
+                    <div style="background:#f5f8ff;border-radius:8px;padding:8px;text-align:center;">
+                        <div style="font-size:10px;color:#8fa0ba;margin-bottom:2px;">A. Salón</div>
+                        <div style="color:#f5a623;font-size:13px;">${starsStr(m.a)}</div>
+                        <div style="font-weight:700;font-size:13px;color:#0b1a30;">${m.a || 0}/5</div>
+                    </div>
+                    <div style="background:#f5f8ff;border-radius:8px;padding:8px;text-align:center;">
+                        <div style="font-size:10px;color:#8fa0ba;margin-bottom:2px;">B. Charlas</div>
+                        <div style="color:#f5a623;font-size:13px;">${starsStr(m.b)}</div>
+                        <div style="font-weight:700;font-size:13px;color:#0b1a30;">${m.b || 0}/5</div>
+                    </div>
+                    <div style="background:#f5f8ff;border-radius:8px;padding:8px;text-align:center;">
+                        <div style="font-size:10px;color:#8fa0ba;margin-bottom:2px;">C. Evento</div>
+                        <div style="color:#f5a623;font-size:13px;">${starsStr(m.c)}</div>
+                        <div style="font-weight:700;font-size:13px;color:#0b1a30;">${m.c || 0}/5</div>
+                    </div>
+                </div>
+                ${m.d ? `<div style="background:#f9fafb;border-radius:8px;padding:10px;font-size:12px;color:#333;line-height:1.5;"><span style="color:#8fa0ba;font-size:10px;text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:4px;">Opinión</span>${m.d}</div>` : ''}
+                ` : '<p style="font-size:12px;color:#aaa;margin:0;">Encuesta enviada sin calificaciones detalladas.</p>'}
+            `;
+            list.appendChild(el);
+        });
     }
 };
 
