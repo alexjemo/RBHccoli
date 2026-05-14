@@ -33,8 +33,9 @@ const adminApp = {
     },
 
     switchTab(tabName) {
-        document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
-        event.target.classList.add('active');
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.classList.toggle('active', (btn.getAttribute('onclick') || '').includes(`'${tabName}'`));
+        });
         const content = document.getElementById('admin-content-area');
         content.innerHTML = '';
         if (tabName === 'events') this.renderEventsTab(content);

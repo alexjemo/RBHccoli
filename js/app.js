@@ -475,7 +475,7 @@ const app = {
                 <div id="photo-preview-wrap" style="display:none;margin-bottom:16px;">
                     <img id="photo-preview-img" style="width:100%;max-height:200px;object-fit:cover;border-radius:12px;border:2px solid #e6f0ff;">
                 </div>
-                <input type="file" id="challenge-photo-input" accept="image/*" capture="environment" style="display:none;" onchange="app.onPhotoSelected(this,'${type}',${cfg.pts||50})">
+                <input type="file" id="challenge-photo-input" accept="image/*" style="display:none;" onchange="app.onPhotoSelected(this,'${type}',${cfg.pts||50})">
                 <button id="btn-pick-photo" class="btn btn-secondary" style="width:100%;" onclick="document.getElementById('challenge-photo-input').click()">
                     <i class="ph ph-camera"></i>&nbsp; Seleccionar / Tomar foto
                 </button>
@@ -511,25 +511,38 @@ const app = {
         };
         const data = texts[type] || texts.social;
         const btn = document.getElementById('btn-share-photo');
+
+        // Sin Web Share API → fallback manual
+        if (!navigator.share) {
+            document.getElementById('share-fallback-msg').classList.remove('hidden');
+            btn.innerHTML = `<i class="ph ph-check-circle"></i>&nbsp; Ya compartí · +${pts} pts`;
+            btn.onclick = () => this.completeExtra(type, pts);
+            return;
+        }
+
         btn.disabled = true;
-        btn.innerHTML = '<i class="ph ph-circle-notch"></i>&nbsp; Abriendo...';
+        btn.innerHTML = '<i class="ph ph-circle-notch"></i>&nbsp; Abriendo…';
+
+        // Construir payload una sola vez (canShare evita el doble-share que rompe el gesto en iOS Safari)
+        const payload = { title: data.title, text: data.text };
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+            payload.files = [file];
+        }
+
         try {
-            if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
-                await navigator.share({ files: [file], title: data.title, text: data.text });
-                await this.completeExtra(type, pts);
-            } else if (navigator.share) {
-                await navigator.share({ title: data.title, text: data.text });
-                await this.completeExtra(type, pts);
+            await navigator.share(payload);
+            await this.completeExtra(type, pts);
+        } catch (err) {
+            btn.disabled = false;
+            if (err.name === 'AbortError') {
+                // Usuario canceló el menú nativo — restaurar botón
+                btn.innerHTML = `<i class="ph ph-share-network"></i>&nbsp; Publicar y ganar +${pts} pts`;
             } else {
+                // Error inesperado → fallback manual
                 document.getElementById('share-fallback-msg').classList.remove('hidden');
-                btn.disabled = false;
-                btn.innerHTML = `<i class="ph ph-check-circle"></i>&nbsp; Confirmar +${pts} pts`;
+                btn.innerHTML = `<i class="ph ph-check-circle"></i>&nbsp; Ya compartí · +${pts} pts`;
                 btn.onclick = () => this.completeExtra(type, pts);
             }
-        } catch(err) {
-            btn.disabled = false;
-            btn.innerHTML = `<i class="ph ph-share-network"></i>&nbsp; Publicar y ganar +${pts} pts`;
-            if (err.name !== 'AbortError') await this.completeExtra(type, pts);
         }
     },
 
@@ -543,10 +556,33 @@ const app = {
 
     async completeExtra(type, points) {
         this.showView('view-loading');
-        await dbAPI.registerActivity(this.currentUser.id, type, points);
-        this.currentUser.total_points += points;
-        await this.loadDashboardData();
-        setTimeout(() => { alert(`¡Felicidades! Has ganado ${points} puntos extra.`); this.showView('view-dashboard'); }, 500);
+        try {
+            await dbAPI.registerActivity(this.currentUser.id, type, points);
+            this.currentUser.total_points += points;
+            await this.loadDashboardData();
+        } catch(e) {
+            console.error('completeExtra error', e);
+        }
+        document.getElementById('extra-title').textContent = '¡Reto completado!';
+        document.getElementById('extra-content').innerHTML = `
+            <div style="display:flex;flex-direction:column;align-items:center;gap:24px;padding:48px 24px;text-align:center;">
+                <div style="width:96px;height:96px;border-radius:50%;background:linear-gradient(135deg,#28a745,#20c997);display:flex;align-items:center;justify-content:center;box-shadow:0 8px 32px rgba(40,167,69,0.35);">
+                    <i class="ph ph-check-bold" style="font-size:48px;color:#fff;"></i>
+                </div>
+                <div>
+                    <h2 style="margin:0 0 6px;font-size:22px;">¡Compartiste con éxito!</h2>
+                    <p style="margin:0;color:#8fa0ba;font-size:13px;">Los puntos ya fueron acreditados a tu cuenta.</p>
+                </div>
+                <div style="background:linear-gradient(135deg,#1a4ef5,#7b2ff7);border-radius:20px;padding:22px 48px;box-shadow:0 8px 32px rgba(26,78,245,0.35);">
+                    <p style="margin:0;color:rgba(255,255,255,0.65);font-size:11px;text-transform:uppercase;letter-spacing:2px;">Puntos ganados</p>
+                    <p style="margin:6px 0 0;color:#fff;font-size:56px;font-weight:900;line-height:1;">+${points}</p>
+                </div>
+                <button class="btn btn-primary" style="width:100%;margin-top:8px;" onclick="app.showView('view-dashboard')">
+                    <i class="ph ph-trophy"></i>&nbsp; Ver mi puntaje
+                </button>
+            </div>
+        `;
+        this.showView('view-extra');
     }
 };
 
