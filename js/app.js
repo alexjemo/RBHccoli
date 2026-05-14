@@ -23,15 +23,17 @@ const dbAPI = {
     // ---- EVENTS ----
     async getEvents(includeInactive = false) {
         if (supabaseClient) {
-            let q = supabaseClient.from('events').select('*').order('id', { ascending: true });
-            if (!includeInactive) q = q.eq('active', true);
-            const { data, error } = await q;
+            // Fetch all events - filter client-side in case 'active' column doesn't exist yet
+            const { data, error } = await supabaseClient.from('events').select('*').order('id', { ascending: true });
             if (error) console.error(error);
-            return data || [];
+            const all = data || [];
+            // If active column exists, filter; if not (null/undefined), treat as active
+            return includeInactive ? all : all.filter(e => e.active !== false);
         }
         const evs = MOCK_DB.events;
         return includeInactive ? evs : evs.filter(e => e.active !== false);
     },
+
 
     async createEvent(name, location, date) {
         if (supabaseClient) {
@@ -463,20 +465,72 @@ const app = {
             `;
             return;
         }
+        // Photo challenges (social, colleague, card) — Web Share API
+        this._pendingShareFile = null;
         titleEl.textContent = cfg.title || 'Reto';
         contentEl.innerHTML = `
-            <div class="glass-card" style="margin-top:20px;">
-                <i class="ph ${cfg.icon}" style="font-size:60px;color:var(--primary-blue);margin-bottom:10px;"></i>
-                <p style="margin-bottom:20px;">${cfg.desc || ''}</p>
-                <input type="file" id="camera-input" accept="image/*" capture="camera" style="display:none;" onchange="document.getElementById('upload-btn').classList.remove('hidden')">
-                <button class="btn btn-secondary mb-2" onclick="document.getElementById('camera-input').click()">
-                    <i class="ph ph-camera"></i> Tomar/Subir Foto
+            <div class="glass-card" style="margin-top:20px;text-align:center;">
+                <i class="ph ${cfg.icon}" style="font-size:56px;color:var(--primary-blue);margin-bottom:8px;"></i>
+                <p style="margin-bottom:20px;color:#8fa0ba;font-size:13px;">${cfg.desc || ''}</p>
+                <div id="photo-preview-wrap" style="display:none;margin-bottom:16px;">
+                    <img id="photo-preview-img" style="width:100%;max-height:200px;object-fit:cover;border-radius:12px;border:2px solid #e6f0ff;">
+                </div>
+                <input type="file" id="challenge-photo-input" accept="image/*" capture="environment" style="display:none;" onchange="app.onPhotoSelected(this,'${type}',${cfg.pts||50})">
+                <button id="btn-pick-photo" class="btn btn-secondary" style="width:100%;" onclick="document.getElementById('challenge-photo-input').click()">
+                    <i class="ph ph-camera"></i>&nbsp; Seleccionar / Tomar foto
                 </button>
-                <button id="upload-btn" class="btn btn-primary hidden mt-4" onclick="app.completeExtra('${type}', ${cfg.pts || 50})">
-                    Validar y Ganar +${cfg.pts || 50} pts
+                <button id="btn-share-photo" class="btn btn-primary mt-4 hidden" style="width:100%;background:linear-gradient(135deg,#1a4ef5,#7b2ff7);" onclick="app.sharePhoto('${type}',${cfg.pts||50})">
+                    <i class="ph ph-share-network"></i>&nbsp; Publicar y ganar +${cfg.pts||50} pts
                 </button>
+                <p id="share-fallback-msg" class="hidden" style="font-size:11px;color:#8fa0ba;margin-top:10px;">Comparte la imagen manualmente y luego pulsa el botón para registrar tus puntos.</p>
             </div>
         `;
+    },
+
+    onPhotoSelected(input, type, pts) {
+        const file = input.files[0];
+        if (!file) return;
+        this._pendingShareFile = file;
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            document.getElementById('photo-preview-img').src = e.target.result;
+            document.getElementById('photo-preview-wrap').style.display = 'block';
+        };
+        reader.readAsDataURL(file);
+        document.getElementById('btn-share-photo').classList.remove('hidden');
+        document.getElementById('btn-pick-photo').innerHTML = '<i class="ph ph-camera"></i>&nbsp; Cambiar foto';
+    },
+
+    async sharePhoto(type, pts) {
+        const file = this._pendingShareFile;
+        if (!file) return;
+        const texts = {
+            social:    { title: '¡En los Encuentros Tecnológicos ALAS! 🚀', text: 'Participando en los Encuentros Tecnológicos ALAS. #EncuentrosALAS #Tecnología' },
+            colleague: { title: '¡Reencuentro en ALAS! 🤝',                 text: 'Genial reencontrarme con colegas. #EncuentrosALAS' },
+            card:      { title: 'Nuevos contactos en ALAS 📇',              text: 'Ampliando mi red en los Encuentros Tecnológicos ALAS. #EncuentrosALAS' },
+        };
+        const data = texts[type] || texts.social;
+        const btn = document.getElementById('btn-share-photo');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="ph ph-circle-notch"></i>&nbsp; Abriendo...';
+        try {
+            if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+                await navigator.share({ files: [file], title: data.title, text: data.text });
+                await this.completeExtra(type, pts);
+            } else if (navigator.share) {
+                await navigator.share({ title: data.title, text: data.text });
+                await this.completeExtra(type, pts);
+            } else {
+                document.getElementById('share-fallback-msg').classList.remove('hidden');
+                btn.disabled = false;
+                btn.innerHTML = `<i class="ph ph-check-circle"></i>&nbsp; Confirmar +${pts} pts`;
+                btn.onclick = () => this.completeExtra(type, pts);
+            }
+        } catch(err) {
+            btn.disabled = false;
+            btn.innerHTML = `<i class="ph ph-share-network"></i>&nbsp; Publicar y ganar +${pts} pts`;
+            if (err.name !== 'AbortError') await this.completeExtra(type, pts);
+        }
     },
 
     rate(section, value) {
