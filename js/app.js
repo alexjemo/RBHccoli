@@ -199,7 +199,7 @@ const dbAPI = {
             const { data: users } = await supabaseClient.from('users').select('id, name, company').eq('event_id', eventId);
             if (!users || !users.length) return [];
             const userIds = users.map(u => u.id);
-            const { data: surveys } = await supabaseClient.from('user_activities').select('user_id, metadata, created_at').eq('activity_type', 'survey').in('user_id', userIds);
+            const { data: surveys } = await supabaseClient.from('user_activities').select('*').eq('activity_type', 'survey').in('user_id', userIds);
             const userMap = Object.fromEntries(users.map(u => [u.id, u]));
             return (surveys || []).map(s => ({ ...s, user: userMap[s.user_id] }));
         }
@@ -232,6 +232,7 @@ const app = {
     sponsors: [],
     activities: [],
     eventsList: [],
+    _localCompletions: new Set(),
 
     init() {
         if (window.location.hash === '#admin' || window.location.search.includes('admin=true')) {
@@ -379,9 +380,8 @@ const app = {
         if (!container) return;
         container.innerHTML = '';
         CHALLENGES_CONFIG.forEach(ch => {
-            const isCompleted = this.activities.some(act =>
-                act.activity_type === ch.type || act.type === ch.type
-            );
+            const isCompleted = this._localCompletions.has(ch.type) ||
+                this.activities.some(act => act.activity_type === ch.type || act.type === ch.type);
             const card = document.createElement('div');
             card.className = `challenge-card ${isCompleted ? 'challenge-done' : ''}`;
             if (!isCompleted) card.onclick = () => this.showView('view-extra', ch.type);
@@ -651,11 +651,9 @@ const app = {
         } catch(e) {
             console.error('registerActivity error', e);
         }
-        // Actualizar estado local inmediatamente — garantiza que los checkmarks aparezcan
+        // Marcar como completado en el set local (persiste aunque loadDashboardData sobreescriba activities)
+        this._localCompletions.add(type);
         this.currentUser.total_points += points;
-        if (!this.activities.some(a => (a.activity_type || a.type) === type)) {
-            this.activities.push({ activity_type: type, type, points });
-        }
         this.renderChallenges();
         const ptsEl = document.getElementById('dash-points');
         if (ptsEl) ptsEl.textContent = this.currentUser.total_points;
