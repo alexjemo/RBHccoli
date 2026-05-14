@@ -145,9 +145,11 @@ const dbAPI = {
         });
     },
 
-    async registerActivity(userId, type, points, sponsorId = null) {
+    async registerActivity(userId, type, points, sponsorId = null, metadata = null) {
         if (supabaseClient) {
-            await supabaseClient.from('user_activities').insert([{ user_id: userId, activity_type: type, points, sponsor_id: sponsorId }]);
+            const record = { user_id: userId, activity_type: type, points, sponsor_id: sponsorId };
+            if (metadata) record.metadata = metadata;
+            await supabaseClient.from('user_activities').insert([record]);
             const { data: user } = await supabaseClient.from('users').select('total_points').eq('id', userId).single();
             await supabaseClient.from('users').update({ total_points: user.total_points + points }).eq('id', userId);
             return;
@@ -190,7 +192,19 @@ const dbAPI = {
                 res(users);
             }, 500);
         });
-    }
+    },
+
+    async getSurveyResults(eventId) {
+        if (supabaseClient) {
+            const { data: users } = await supabaseClient.from('users').select('id, name, company').eq('event_id', eventId);
+            if (!users || !users.length) return [];
+            const userIds = users.map(u => u.id);
+            const { data: surveys } = await supabaseClient.from('user_activities').select('user_id, metadata, created_at').eq('activity_type', 'survey').in('user_id', userIds);
+            const userMap = Object.fromEntries(users.map(u => [u.id, u]));
+            return (surveys || []).map(s => ({ ...s, user: userMap[s.user_id] }));
+        }
+        return [];
+    },
 };
 
 window.dbAPI = dbAPI;
@@ -461,7 +475,7 @@ const app = {
                     </div>
                 </div>
                 <div class="survey-section"><p>D. Opinión</p><textarea placeholder="Escribe tu opinión aquí..."></textarea></div>
-                <button class="btn btn-primary mt-4" onclick="app.completeExtra('survey', 100)">Enviar encuesta (+100 pts)</button>
+                <button class="btn btn-primary mt-4" onclick="app.submitSurvey()">Enviar encuesta (+100 pts)</button>
             `;
             return;
         }
@@ -569,6 +583,22 @@ const app = {
         }
     },
 
+    submitSurvey() {
+        const getRating = (section) => {
+            const el = document.getElementById(`stars-${section}`);
+            if (!el) return 0;
+            return [...el.children].filter(s => s.classList.contains('active')).length;
+        };
+        const textarea = document.querySelector('#extra-content textarea');
+        const metadata = {
+            a: getRating('A'),
+            b: getRating('B'),
+            c: getRating('C'),
+            d: textarea ? textarea.value.trim() : ''
+        };
+        this.completeExtra('survey', 100, null, metadata);
+    },
+
     rate(section, value) {
         const stars = document.getElementById(`stars-${section}`).children;
         for (let i = 0; i < 5; i++) {
@@ -614,15 +644,22 @@ const app = {
         await this.completeExtra('card', pts, 'Hemos guardado esta tarjeta de contacto en tu galería.');
     },
 
-    async completeExtra(type, points, customMsg = null) {
+    async completeExtra(type, points, customMsg = null, metadata = null) {
         this.showView('view-loading');
         try {
-            await dbAPI.registerActivity(this.currentUser.id, type, points);
-            this.currentUser.total_points += points;
-            await this.loadDashboardData();
+            await dbAPI.registerActivity(this.currentUser.id, type, points, null, metadata);
         } catch(e) {
-            console.error('completeExtra error', e);
+            console.error('registerActivity error', e);
         }
+        // Actualizar estado local inmediatamente — garantiza que los checkmarks aparezcan
+        this.currentUser.total_points += points;
+        if (!this.activities.some(a => (a.activity_type || a.type) === type)) {
+            this.activities.push({ activity_type: type, type, points });
+        }
+        this.renderChallenges();
+        const ptsEl = document.getElementById('dash-points');
+        if (ptsEl) ptsEl.textContent = this.currentUser.total_points;
+
         const msg = customMsg || 'Los puntos han sido acreditados a tu cuenta.';
         document.getElementById('extra-title').textContent = 'Reto completado';
         document.getElementById('extra-content').innerHTML = `

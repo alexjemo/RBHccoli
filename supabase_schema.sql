@@ -62,6 +62,7 @@ CREATE TABLE user_activities (
     activity_type VARCHAR(100) NOT NULL, -- e.g., 'sponsor_quiz', 'social', 'colleague', 'survey', 'card'
     sponsor_id INTEGER REFERENCES sponsors(id) ON DELETE SET NULL, -- Only used if activity is sponsor quiz
     points INTEGER NOT NULL,
+    metadata JSONB,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     -- Ensure user can't repeat the same activity type (unless it's a quiz, then unique per sponsor)
     -- This is a bit tricky to enforce purely in SQL constraints without a partial index, but we handle it in JS.
@@ -95,3 +96,6 @@ CREATE POLICY "Allow public update users" ON users FOR UPDATE USING (true);
 -- Create policy to allow public READ and INSERT to activities
 CREATE POLICY "Allow public read activities" ON user_activities FOR SELECT USING (true);
 CREATE POLICY "Allow public insert activities" ON user_activities FOR INSERT WITH CHECK (true);
+
+-- Add metadata column to existing databases (run if table already exists)
+ALTER TABLE user_activities ADD COLUMN IF NOT EXISTS metadata JSONB;

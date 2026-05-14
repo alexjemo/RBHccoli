@@ -290,17 +290,61 @@ const adminApp = {
         list.innerHTML = '<p style="text-align:center;color:#666;">Cargando...</p>';
         const users = await dbAPI.getLeaderboard(eventId);
         list.innerHTML = '';
-        if (!users.length) { list.innerHTML = '<p style="text-align:center;color:#666;">No hay usuarios registrados.</p>'; return; }
-        users.forEach((u, i) => {
-            const el = document.createElement('div');
-            el.className = 'leaderboard-item';
-            el.innerHTML = `
-                <div class="lb-rank">#${i+1}</div>
-                <div class="lb-info"><div class="lb-name">${u.name}</div><div class="lb-company">${u.company||''}</div></div>
-                <div class="lb-points">${u.total_points} pts</div>
-            `;
-            list.appendChild(el);
-        });
+
+        if (!users.length) {
+            list.innerHTML = '<p style="text-align:center;color:#666;">No hay usuarios registrados.</p>';
+        } else {
+            users.forEach((u, i) => {
+                const el = document.createElement('div');
+                el.className = 'leaderboard-item';
+                el.innerHTML = `
+                    <div class="lb-rank">#${i+1}</div>
+                    <div class="lb-info"><div class="lb-name">${u.name}</div><div class="lb-company">${u.company||''}</div></div>
+                    <div class="lb-points">${u.total_points} pts</div>
+                `;
+                list.appendChild(el);
+            });
+        }
+
+        // Resultados de encuestas
+        const surveys = await dbAPI.getSurveyResults(eventId);
+        if (surveys.length) {
+            const section = document.createElement('div');
+            section.style.cssText = 'margin-top:28px;';
+            section.innerHTML = `<h3 style="margin:0 0 12px;font-size:15px;color:#0b1a30;">Resultados de encuestas</h3>`;
+            const stars = (n) => '★'.repeat(n) + '☆'.repeat(5 - n);
+            surveys.forEach(s => {
+                const m = s.metadata || {};
+                const el = document.createElement('div');
+                el.style.cssText = 'background:#fff;border-radius:12px;padding:14px 16px;margin-bottom:10px;box-shadow:0 2px 8px rgba(0,0,0,0.05);';
+                el.innerHTML = `
+                    <div style="font-weight:700;font-size:13px;color:#0b1a30;margin-bottom:10px;">
+                        ${s.user?.name || 'Usuario'}
+                        <span style="font-weight:400;color:#8fa0ba;font-size:12px;margin-left:6px;">${s.user?.company || ''}</span>
+                    </div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;font-size:11px;color:#333;">
+                        <div style="background:#f5f8ff;border-radius:8px;padding:8px;text-align:center;">
+                            <div style="color:#8fa0ba;margin-bottom:2px;">A. Salón</div>
+                            <div style="color:#f5a623;font-size:13px;">${stars(m.a||0)}</div>
+                            <div style="font-weight:700;">${m.a||0}/5</div>
+                        </div>
+                        <div style="background:#f5f8ff;border-radius:8px;padding:8px;text-align:center;">
+                            <div style="color:#8fa0ba;margin-bottom:2px;">B. Charlas</div>
+                            <div style="color:#f5a623;font-size:13px;">${stars(m.b||0)}</div>
+                            <div style="font-weight:700;">${m.b||0}/5</div>
+                        </div>
+                        <div style="background:#f5f8ff;border-radius:8px;padding:8px;text-align:center;">
+                            <div style="color:#8fa0ba;margin-bottom:2px;">C. Evento</div>
+                            <div style="color:#f5a623;font-size:13px;">${stars(m.c||0)}</div>
+                            <div style="font-weight:700;">${m.c||0}/5</div>
+                        </div>
+                    </div>
+                    ${m.d ? `<div style="margin-top:10px;font-size:12px;color:#555;border-top:1px solid #eee;padding-top:8px;"><span style="color:#8fa0ba;">Opinión: </span>${m.d}</div>` : ''}
+                `;
+                section.appendChild(el);
+            });
+            list.after(section);
+        }
     }
 };
 
