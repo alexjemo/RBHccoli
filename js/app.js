@@ -206,10 +206,10 @@ function normalizeSponsor(s) {
 }
 
 const CHALLENGES_CONFIG = [
-    { type: 'social',    title: 'Foto en Redes',          desc: 'Sube una foto etiquetando a ALAS', pts: 50,  icon: 'ph-camera' },
-    { type: 'colleague', title: 'Foto con Colega',         desc: 'Reencuentro con un colega',        pts: 50,  icon: 'ph-users' },
-    { type: 'survey',    title: 'Encuesta del Evento',     desc: 'Danos tu opinión',                 pts: 100, icon: 'ph-list-numbers' },
-    { type: 'card',      title: 'Tarjeta de Presentación', desc: 'Guarda contacto de un expositor',  pts: 50,  icon: 'ph-address-book' },
+    { type: 'social',    title: 'Foto en redes',          desc: 'Sube una foto etiquetando a ALAS',       pts: 50,  icon: 'ph-camera' },
+    { type: 'colleague', title: 'Foto con colega',         desc: 'Reencuentro con un colega',              pts: 50,  icon: 'ph-users' },
+    { type: 'survey',    title: 'Encuesta del evento',     desc: 'Danos tu opinión',                       pts: 100, icon: 'ph-list-numbers' },
+    { type: 'card',      title: 'Tarjeta de presentación', desc: 'Fotografía la tarjeta para guardarla',   pts: 50,  icon: 'ph-address-book' },
 ];
 
 const app = {
@@ -433,7 +433,7 @@ const app = {
         contentEl.innerHTML = '';
         const isCompleted = this.activities.some(act => act.activity_type === type || act.type === type);
         if (isCompleted) {
-            titleEl.textContent = "Reto Completado";
+            titleEl.textContent = 'Reto completado';
             contentEl.innerHTML = `
                 <i class="ph ph-check-circle" style="font-size:80px;color:#28a745;margin-bottom:20px;"></i>
                 <h3 style="text-align:center;">Ya completaste este reto.</h3>
@@ -443,7 +443,7 @@ const app = {
         }
         const cfg = CHALLENGES_CONFIG.find(c => c.type === type) || {};
         if (type === 'survey') {
-            titleEl.textContent = "Encuesta";
+            titleEl.textContent = 'Encuesta del evento';
             contentEl.innerHTML = `
                 <div class="survey-section"><p>A. Salón de exposiciones y conferencias</p>
                     <div class="stars" id="stars-A">
@@ -461,11 +461,34 @@ const app = {
                     </div>
                 </div>
                 <div class="survey-section"><p>D. Opinión</p><textarea placeholder="Escribe tu opinión aquí..."></textarea></div>
-                <button class="btn btn-primary mt-4" onclick="app.completeExtra('survey', 100)">Enviar Encuesta (+100 pts)</button>
+                <button class="btn btn-primary mt-4" onclick="app.completeExtra('survey', 100)">Enviar encuesta (+100 pts)</button>
             `;
             return;
         }
-        // Photo challenges (social, colleague, card) — Web Share API
+        // Tarjeta de presentación — guardar en galería
+        if (type === 'card') {
+            this._pendingShareFile = null;
+            titleEl.textContent = cfg.title;
+            contentEl.innerHTML = `
+                <div class="glass-card" style="margin-top:20px;text-align:center;">
+                    <i class="ph ph-address-book" style="font-size:56px;color:var(--primary-blue);margin-bottom:8px;"></i>
+                    <p style="margin-bottom:20px;color:#8fa0ba;font-size:13px;">${cfg.desc}</p>
+                    <div id="photo-preview-wrap" style="display:none;margin-bottom:16px;">
+                        <img id="photo-preview-img" style="width:100%;max-height:200px;object-fit:cover;border-radius:12px;border:2px solid #e6f0ff;">
+                    </div>
+                    <input type="file" id="challenge-photo-input" accept="image/*" style="display:none;" onchange="app.onPhotoSelected(this,'card',${cfg.pts||50})">
+                    <button id="btn-pick-photo" class="btn btn-secondary" style="width:100%;" onclick="document.getElementById('challenge-photo-input').click()">
+                        <i class="ph ph-camera"></i>&nbsp; Fotografiar tarjeta
+                    </button>
+                    <button id="btn-share-photo" class="btn btn-primary mt-4 hidden" style="width:100%;background:linear-gradient(135deg,#1a4ef5,#7b2ff7);" onclick="app.saveCard(${cfg.pts||50})">
+                        <i class="ph ph-floppy-disk"></i>&nbsp; Guardar en galería (+${cfg.pts||50} pts)
+                    </button>
+                    <p id="share-fallback-msg" class="hidden" style="font-size:11px;color:#8fa0ba;margin-top:10px;">Descarga la imagen para guardarla en tu dispositivo.</p>
+                </div>
+            `;
+            return;
+        }
+        // Foto en redes / Foto con colega — Web Share API
         this._pendingShareFile = null;
         titleEl.textContent = cfg.title || 'Reto';
         contentEl.innerHTML = `
@@ -554,7 +577,44 @@ const app = {
         }
     },
 
-    async completeExtra(type, points) {
+    async saveCard(pts) {
+        const file = this._pendingShareFile;
+        if (!file) return;
+        const btn = document.getElementById('btn-share-photo');
+
+        // En iOS/Android con Web Share API + soporte de archivos → menú nativo con "Guardar imagen"
+        if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+            btn.disabled = true;
+            btn.innerHTML = '<i class="ph ph-circle-notch"></i>&nbsp; Guardando…';
+            try {
+                await navigator.share({ files: [file], title: 'Tarjeta de contacto' });
+                await this.completeExtra('card', pts, 'Hemos guardado esta tarjeta de contacto en tu galería.');
+                return;
+            } catch (err) {
+                btn.disabled = false;
+                if (err.name === 'AbortError') {
+                    btn.innerHTML = `<i class="ph ph-floppy-disk"></i>&nbsp; Guardar en galería (+${pts} pts)`;
+                    return;
+                }
+            }
+        }
+
+        // Fallback: descarga directa (Android Chrome / desktop)
+        try {
+            const url = URL.createObjectURL(file);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'tarjeta-contacto.jpg';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            setTimeout(() => URL.revokeObjectURL(url), 100);
+        } catch(e) { /* ignore */ }
+
+        await this.completeExtra('card', pts, 'Hemos guardado esta tarjeta de contacto en tu galería.');
+    },
+
+    async completeExtra(type, points, customMsg = null) {
         this.showView('view-loading');
         try {
             await dbAPI.registerActivity(this.currentUser.id, type, points);
@@ -563,15 +623,16 @@ const app = {
         } catch(e) {
             console.error('completeExtra error', e);
         }
-        document.getElementById('extra-title').textContent = '¡Reto completado!';
+        const msg = customMsg || 'Los puntos han sido acreditados a tu cuenta.';
+        document.getElementById('extra-title').textContent = 'Reto completado';
         document.getElementById('extra-content').innerHTML = `
             <div style="display:flex;flex-direction:column;align-items:center;gap:24px;padding:48px 24px;text-align:center;">
                 <div style="width:96px;height:96px;border-radius:50%;background:linear-gradient(135deg,#28a745,#20c997);display:flex;align-items:center;justify-content:center;box-shadow:0 8px 32px rgba(40,167,69,0.35);">
                     <i class="ph ph-check-bold" style="font-size:48px;color:#fff;"></i>
                 </div>
                 <div>
-                    <h2 style="margin:0 0 6px;font-size:22px;">¡Compartiste con éxito!</h2>
-                    <p style="margin:0;color:#8fa0ba;font-size:13px;">Los puntos ya fueron acreditados a tu cuenta.</p>
+                    <h2 style="margin:0 0 6px;font-size:22px;">¡Reto completado!</h2>
+                    <p style="margin:0;color:#8fa0ba;font-size:13px;">${msg}</p>
                 </div>
                 <div style="background:linear-gradient(135deg,#1a4ef5,#7b2ff7);border-radius:20px;padding:22px 48px;box-shadow:0 8px 32px rgba(26,78,245,0.35);">
                     <p style="margin:0;color:rgba(255,255,255,0.65);font-size:11px;text-transform:uppercase;letter-spacing:2px;">Puntos ganados</p>
