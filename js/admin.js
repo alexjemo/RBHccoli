@@ -300,24 +300,56 @@ const adminApp = {
             list.innerHTML = '<p style="text-align:center;color:#aaa;padding:30px;">No hay usuarios registrados.</p>';
             return;
         }
-        const medals = ['🥇', '🥈', '🥉'];
-        const topClass = ['lb-top1', 'lb-top2', 'lb-top3'];
-        users.forEach((u, i) => {
-            const el = document.createElement('div');
-            el.className = `leaderboard-item ${topClass[i] || ''}`;
-            const rankDisplay = i < 3
-                ? `<span style="font-size:36px;line-height:1;">${medals[i]}</span>`
-                : `<span style="font-size:22px;font-weight:900;color:#8fa0ba;">#${i+1}</span>`;
-            el.innerHTML = `
-                <div class="lb-rank" style="width:60px;text-align:center;">${rankDisplay}</div>
-                <div class="lb-info">
-                    <div class="lb-name">${u.name}</div>
-                    <div class="lb-company">${u.company || ''}</div>
-                </div>
-                <div class="lb-points">${u.total_points} <span style="font-size:16px;font-weight:600;opacity:0.6;">pts</span></div>
+
+        // Podio top 3 — fila horizontal
+        const podium = document.createElement('div');
+        podium.style.cssText = 'display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:20px;';
+        const podiumOrder = [1, 0, 2]; // plata | oro | bronce
+        const medals    = ['🥇','🥈','🥉'];
+        const podiumBg  = [
+            'linear-gradient(135deg,#fff9e0,#ffe970)',
+            'linear-gradient(135deg,#edf0f4,#d0d8e4)',
+            'linear-gradient(135deg,#fff2eb,#f5cba7)',
+        ];
+        const podiumBorder = ['#d4a000','#8a9ab0','#a0522d'];
+        const podiumSize   = ['28px','22px','22px'];
+
+        podiumOrder.forEach(idx => {
+            const u = users[idx];
+            if (!u) { podium.appendChild(document.createElement('div')); return; }
+            const card = document.createElement('div');
+            card.style.cssText = `background:${podiumBg[idx]};border:2px solid ${podiumBorder[idx]};border-radius:16px;padding:16px 12px;text-align:center;`;
+            card.innerHTML = `
+                <div style="font-size:40px;line-height:1;margin-bottom:6px;">${medals[idx]}</div>
+                <div style="font-weight:900;font-size:${podiumSize[idx]};color:#0b1a30;line-height:1.2;">${u.name}</div>
+                <div style="font-size:11px;color:#8fa0ba;margin:3px 0 8px;">${u.company||''}</div>
+                <div style="font-weight:900;font-size:24px;color:${podiumBorder[idx]};">${u.total_points}</div>
+                <div style="font-size:11px;color:${podiumBorder[idx]};font-weight:600;">pts</div>
             `;
-            list.appendChild(el);
+            podium.appendChild(card);
         });
+        list.appendChild(podium);
+
+        // Posiciones 4+ en dos columnas compactas
+        const rest = users.slice(3);
+        if (!rest.length) return;
+
+        const grid = document.createElement('div');
+        grid.style.cssText = 'display:grid;grid-template-columns:1fr 1fr;gap:8px;';
+        rest.forEach((u, i) => {
+            const el = document.createElement('div');
+            el.style.cssText = 'background:#fff;border-radius:12px;padding:10px 14px;display:flex;align-items:center;gap:10px;box-shadow:0 2px 8px rgba(0,0,0,0.05);';
+            el.innerHTML = `
+                <span style="font-size:16px;font-weight:900;color:#c0cad8;width:32px;flex-shrink:0;text-align:center;">#${i+4}</span>
+                <div style="flex:1;min-width:0;">
+                    <div style="font-weight:700;font-size:14px;color:#0b1a30;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${u.name}</div>
+                    <div style="font-size:11px;color:#8fa0ba;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${u.company||''}</div>
+                </div>
+                <div style="font-weight:900;font-size:16px;color:var(--primary-blue);white-space:nowrap;">${u.total_points} <span style="font-size:11px;font-weight:600;opacity:0.6;">pts</span></div>
+            `;
+            grid.appendChild(el);
+        });
+        list.appendChild(grid);
     },
 
     // =================== ENCUESTAS ===================
