@@ -272,15 +272,20 @@ const adminApp = {
     async renderLeaderboardTab(container) {
         const events = await dbAPI.getEvents(true);
         container.innerHTML = `
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;">
-                <h3 style="margin:0;">Leaderboard</h3>
-                <button class="btn btn-secondary" style="width:auto;padding:5px 10px;" onclick="adminApp.loadLeaderboardForEvent(document.getElementById('lb-event-selector').value)"><i class="ph ph-arrows-clockwise"></i></button>
+            <div style="text-align:center;margin-bottom:20px;padding:16px 0 0;">
+                <img src="Assets/logo.png" alt="ALAS" style="height:56px;object-fit:contain;display:block;margin:0 auto 12px;">
+                <div style="width:48px;height:3px;background:var(--primary-blue);border-radius:2px;margin:0 auto;"></div>
             </div>
-            <select id="lb-event-selector" onchange="adminApp.loadLeaderboardForEvent(this.value)"
-                style="width:100%;padding:10px;border:1px solid #ccc;border-radius:8px;font-size:13px;margin-bottom:15px;">
-                <option value="">-- Selecciona un evento --</option>
-                ${events.map(ev => `<option value="${ev.id}">${ev.name.replace('Workshop','Encuentros Tecnológicos')}</option>`).join('')}
-            </select>
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:15px;">
+                <select id="lb-event-selector" onchange="adminApp.loadLeaderboardForEvent(this.value)"
+                    style="flex:1;padding:10px;border:1px solid #ccc;border-radius:8px;font-size:13px;">
+                    <option value="">-- Selecciona un evento --</option>
+                    ${events.map(ev => `<option value="${ev.id}">${ev.name.replace('Workshop','Encuentros Tecnológicos')}</option>`).join('')}
+                </select>
+                <button class="btn btn-secondary" style="width:auto;padding:10px 12px;flex-shrink:0;" onclick="adminApp.loadLeaderboardForEvent(document.getElementById('lb-event-selector').value)">
+                    <i class="ph ph-arrows-clockwise"></i>
+                </button>
+            </div>
             <div id="lb-list"></div>
         `;
     },
@@ -288,20 +293,28 @@ const adminApp = {
     async loadLeaderboardForEvent(eventId) {
         if (!eventId) return;
         const list = document.getElementById('lb-list');
-        list.innerHTML = '<p style="text-align:center;color:#666;">Cargando...</p>';
+        list.innerHTML = '<p style="text-align:center;color:#666;padding:20px;">Cargando...</p>';
         const users = await dbAPI.getLeaderboard(eventId);
         list.innerHTML = '';
         if (!users.length) {
-            list.innerHTML = '<p style="text-align:center;color:#666;">No hay usuarios registrados.</p>';
+            list.innerHTML = '<p style="text-align:center;color:#aaa;padding:30px;">No hay usuarios registrados.</p>';
             return;
         }
+        const medals = ['🥇', '🥈', '🥉'];
+        const topClass = ['lb-top1', 'lb-top2', 'lb-top3'];
         users.forEach((u, i) => {
             const el = document.createElement('div');
-            el.className = 'leaderboard-item';
+            el.className = `leaderboard-item ${topClass[i] || ''}`;
+            const rankDisplay = i < 3
+                ? `<span style="font-size:36px;line-height:1;">${medals[i]}</span>`
+                : `<span style="font-size:22px;font-weight:900;color:#8fa0ba;">#${i+1}</span>`;
             el.innerHTML = `
-                <div class="lb-rank">#${i+1}</div>
-                <div class="lb-info"><div class="lb-name">${u.name}</div><div class="lb-company">${u.company||''}</div></div>
-                <div class="lb-points">${u.total_points} pts</div>
+                <div class="lb-rank" style="width:60px;text-align:center;">${rankDisplay}</div>
+                <div class="lb-info">
+                    <div class="lb-name">${u.name}</div>
+                    <div class="lb-company">${u.company || ''}</div>
+                </div>
+                <div class="lb-points">${u.total_points} <span style="font-size:16px;font-weight:600;opacity:0.6;">pts</span></div>
             `;
             list.appendChild(el);
         });

@@ -391,17 +391,31 @@ h2 { font-size: 18px; font-weight: 600; color: var(--text-main); margin-bottom: 
 .leaderboard-item {
     display: flex;
     justify-content: space-between;
-    padding: 12px;
+    align-items: center;
+    padding: 18px 24px;
     background: var(--white);
-    border-radius: 8px;
-    margin-bottom: 8px;
-    box-shadow: var(--shadow-sm);
+    border-radius: 16px;
+    margin-bottom: 12px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.07);
+    transition: transform 0.15s;
 }
-.lb-rank { font-weight: 800; color: var(--primary-blue); width: 30px; }
-.lb-info { flex: 1; }
-.lb-name { font-weight: 600; font-size: 14px;}
-.lb-company { font-size: 11px; color: var(--text-muted); }
-.lb-points { font-weight: 800; color: var(--gold); }
+.lb-rank {
+    font-weight: 900;
+    color: var(--primary-blue);
+    font-size: 28px;
+    width: 56px;
+    flex-shrink: 0;
+}
+.lb-info { flex: 1; padding: 0 16px; }
+.lb-name { font-weight: 700; font-size: 22px; color: #0b1a30; }
+.lb-company { font-size: 14px; color: var(--text-muted); margin-top: 2px; }
+.lb-points { font-weight: 900; font-size: 28px; color: var(--primary-blue); white-space: nowrap; }
+.lb-top1 { background: linear-gradient(135deg, #fff9e6, #fff3cc); border: 2px solid #f5c518; }
+.lb-top1 .lb-rank, .lb-top1 .lb-points { color: #d4a000; }
+.lb-top2 { background: linear-gradient(135deg, #f5f7fa, #e8ecf0); border: 2px solid #a0aab8; }
+.lb-top2 .lb-rank, .lb-top2 .lb-points { color: #6b7a8d; }
+.lb-top3 { background: linear-gradient(135deg, #fff4ef, #ffe8dc); border: 2px solid #cd7f32; }
+.lb-top3 .lb-rank, .lb-top3 .lb-points { color: #a0522d; }
 
 /* Survey styles */
 .survey-section {
