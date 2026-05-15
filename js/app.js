@@ -471,22 +471,50 @@ const app = {
         if (type === 'survey') {
             titleEl.textContent = 'Encuesta del evento';
             contentEl.innerHTML = `
-                <div class="survey-section"><p>A. Salón de exposiciones y conferencias</p>
+                <div class="survey-section">
+                    <p>A. Salón de exposiciones y conferencias</p>
                     <div class="stars" id="stars-A">
-                        <i class="ph-fill ph-star" onclick="app.rate('A',1)"></i><i class="ph-fill ph-star" onclick="app.rate('A',2)"></i><i class="ph-fill ph-star" onclick="app.rate('A',3)"></i><i class="ph-fill ph-star" onclick="app.rate('A',4)"></i><i class="ph-fill ph-star" onclick="app.rate('A',5)"></i>
+                        <i class="ph-fill ph-star" onclick="app.rate('A',1)"></i>
+                        <i class="ph-fill ph-star" onclick="app.rate('A',2)"></i>
+                        <i class="ph-fill ph-star" onclick="app.rate('A',3)"></i>
+                        <i class="ph-fill ph-star" onclick="app.rate('A',4)"></i>
+                        <i class="ph-fill ph-star" onclick="app.rate('A',5)"></i>
                     </div>
                 </div>
-                <div class="survey-section"><p>B. Evaluación de las charlas</p>
+                <div class="survey-section">
+                    <p>B. Evaluación de las charlas</p>
                     <div class="stars" id="stars-B">
-                        <i class="ph-fill ph-star" onclick="app.rate('B',1)"></i><i class="ph-fill ph-star" onclick="app.rate('B',2)"></i><i class="ph-fill ph-star" onclick="app.rate('B',3)"></i><i class="ph-fill ph-star" onclick="app.rate('B',4)"></i><i class="ph-fill ph-star" onclick="app.rate('B',5)"></i>
+                        <i class="ph-fill ph-star" onclick="app.rate('B',1)"></i>
+                        <i class="ph-fill ph-star" onclick="app.rate('B',2)"></i>
+                        <i class="ph-fill ph-star" onclick="app.rate('B',3)"></i>
+                        <i class="ph-fill ph-star" onclick="app.rate('B',4)"></i>
+                        <i class="ph-fill ph-star" onclick="app.rate('B',5)"></i>
                     </div>
                 </div>
-                <div class="survey-section"><p>C. Evento en general</p>
+                <div class="survey-section">
+                    <p>C. Evento en general</p>
                     <div class="stars" id="stars-C">
-                        <i class="ph-fill ph-star" onclick="app.rate('C',1)"></i><i class="ph-fill ph-star" onclick="app.rate('C',2)"></i><i class="ph-fill ph-star" onclick="app.rate('C',3)"></i><i class="ph-fill ph-star" onclick="app.rate('C',4)"></i><i class="ph-fill ph-star" onclick="app.rate('C',5)"></i>
+                        <i class="ph-fill ph-star" onclick="app.rate('C',1)"></i>
+                        <i class="ph-fill ph-star" onclick="app.rate('C',2)"></i>
+                        <i class="ph-fill ph-star" onclick="app.rate('C',3)"></i>
+                        <i class="ph-fill ph-star" onclick="app.rate('C',4)"></i>
+                        <i class="ph-fill ph-star" onclick="app.rate('C',5)"></i>
                     </div>
                 </div>
-                <div class="survey-section"><p>D. Opinión</p><textarea placeholder="Escribe tu opinión aquí..."></textarea></div>
+                <div class="survey-section">
+                    <p>D. Tu opinión</p>
+                    <textarea
+                        id="survey-opinion"
+                        placeholder="Escribe tu opinión aquí..."
+                        inputmode="text"
+                        autocomplete="off"
+                        autocorrect="on"
+                        autocapitalize="sentences"
+                        spellcheck="true"
+                        enterkeyhint="done"
+                        rows="5"
+                    ></textarea>
+                </div>
                 <button class="btn btn-primary mt-4" onclick="app.submitSurvey()">Enviar encuesta (+100 pts)</button>
             `;
             return;
@@ -601,7 +629,7 @@ const app = {
             if (!el) return 0;
             return [...el.children].filter(s => s.classList.contains('active')).length;
         };
-        const textarea = document.querySelector('#extra-content textarea');
+        const textarea = document.getElementById('survey-opinion');
         const metadata = {
             a: getRating('A'),
             b: getRating('B'),
