@@ -286,6 +286,7 @@ const app = {
                 this.eventsList = events;
                 const list = document.getElementById('events-list');
                 list.innerHTML = '';
+                events.sort((a, b) => new Date(a.date) - new Date(b.date));
                 events.forEach(ev => {
                     const card = document.createElement('div');
                     card.className = 'event-card';
@@ -294,7 +295,7 @@ const app = {
                     const emoji = parts[1] || '';
                     const eventDate = ev.date ? new Date(ev.date).toLocaleDateString() : '';
                     card.innerHTML = `
-                        ${emoji ? `<span style="font-size: 32px; line-height: 1; flex-shrink: 0;">${emoji}</span>` : ''}
+                        ${emoji ? `<span style="font-size: 32px; line-height: 1; flex-shrink: 0; margin-right: 5px;">${emoji}</span>` : ''}
                         <div class="event-card-info">
                             <h3>${ev.name.split(' - ')[0].replace('Workshop', 'Encuentros Tecnológicos')}</h3>
                             <p style="text-transform: uppercase;">${locText} • ${eventDate}</p>
